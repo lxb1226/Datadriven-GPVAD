@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import argparse
+from email.mime import base
 import librosa
+from torch import log
 from tqdm import tqdm
 import io
 import logging
@@ -81,11 +83,23 @@ def extract_feature(fname):
     return fname, lms_feature
 
 
+files = DF[ARGS.col].unique()
 with h5py.File(ARGS.output, 'w') as store:
-    for fname, feat in tqdm(pr.map(extract_feature,
-                                   DF[ARGS.col].unique(),
-                                   workers=ARGS.c,
-                                   maxsize=4),
-                            total=len(DF[ARGS.col].unique())):
+    for name in files:
+        try:
+            fname, feat = extract_feature(name)
+            print(fname)
+        except Exception as e:
+            continue
         basename = Path(fname).name
         store[basename] = feat
+
+
+# with h5py.File(ARGS.output, 'w') as store:
+#     for fname, feat in tqdm(pr.map(extract_feature,
+#                                    DF[ARGS.col].unique(),
+#                                    workers=ARGS.c,
+#                                    maxsize=4),
+#                             total=len(DF[ARGS.col].unique())):
+#         basename = Path(fname).name
+#         store[basename] = feat

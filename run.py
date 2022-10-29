@@ -38,6 +38,7 @@ DEVICE = torch.device(DEVICE)
 
 class Runner(object):
     """Main class to run experiments with e.g., train and evaluate"""
+
     def __init__(self, seed=42):
         """__init__
 
@@ -94,6 +95,7 @@ class Runner(object):
         # utils.pprint_dict
         utils.pprint_dict(config_parameters, logger.info)
         logger.info("Running on device {}".format(DEVICE))
+        # soft labels that predicted by teacher model
         label_df = pd.read_csv(config_parameters['label'], sep='\s+')
         data_df = pd.read_csv(config_parameters['data'], sep='\s+')
         # In case that both are not matching
@@ -192,13 +194,21 @@ class Runner(object):
                                     batchsize, timesteps)
             mask = (idxs < length.view(-1, 1)).to(y.device)
             y = y * mask.unsqueeze(-1)
+            # logger.debug("==============before=================")
+            # logger.debug(f"y_pred : {y_pred}\ny: {y}")
             y_pred = torch.round(y_pred)
             y = torch.round(y)
+
+            y_pred = y_pred.contiguous().view(y_pred.size()[0], -1)
+            y = y.contiguous().view(y.size()[0], -1)
+            # logger.debug("==============after=================")
+            # logger.debug(f"y_pred : {y_pred}\ny: {y}")
+
             return y_pred, y
 
         metrics = {
             'Loss': losses.Loss(
-                criterion),  #reimplementation of Loss, supports 3 way loss 
+                criterion),  # reimplementation of Loss, supports 3 way loss
             'Precision': Precision(thresholded_output_transform),
             'Recall': Recall(thresholded_output_transform),
             'Accuracy': Accuracy(thresholded_output_transform),
@@ -286,7 +296,7 @@ class Runner(object):
         model.load_state_dict(model_parameters)
         model = model.to(DEVICE).eval()
 
-        ## VAD preprocessing data
+        # VAD preprocessing data
         logger.trace(model)
 
         output_dfs = []
@@ -468,7 +478,7 @@ class Runner(object):
         model.load_state_dict(model_parameters)
         model = model.to(DEVICE).eval()
 
-        ## VAD preprocessing data
+        # VAD preprocessing data
         vad_label_helper_df = label_df.copy()
         vad_label_helper_df['onset'] = np.ceil(vad_label_helper_df['onset'] /
                                                model_resolution).astype(int)
@@ -488,7 +498,7 @@ class Runner(object):
         output_dfs = []
 
         speech_label_idx = np.where('Speech' == encoder.classes_)[0].squeeze()
-        speech_frame_predictions, speech_frame_ground_truth, speech_frame_prob_predictions = [], [],[]
+        speech_frame_predictions, speech_frame_ground_truth, speech_frame_prob_predictions = [], [], []
         # Using only binary thresholding without filter
         if len(threshold) == 1:
             postprocessing_method = utils.binarize
@@ -511,10 +521,10 @@ class Runner(object):
                     thresholded_prediction = postprocessing_method(
                         prediction_time, *threshold)
 
-                    ## VAD predictions
+                    # VAD predictions
                     speech_frame_prob_predictions.append(
                         prediction_time[..., speech_label_idx].squeeze())
-                    ### Thresholded speech predictions
+                    # Thresholded speech predictions
                     speech_prediction = thresholded_prediction[
                         ..., speech_label_idx].squeeze()
                     speech_frame_predictions.append(speech_prediction)
@@ -527,7 +537,7 @@ class Runner(object):
                         target_arr[start:end] = 1
                     speech_frame_ground_truth.append(target_arr)
 
-                    #### SED predictions
+                    # SED predictions
 
                     labelled_predictions = utils.decode_with_timestamps(
                         encoder, thresholded_prediction)
@@ -566,7 +576,7 @@ class Runner(object):
 
         p_miss = 100 * (fn / (fn + tp))
         p_fa = 100 * (fp / (fp + tn))
-        for i in [0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 0.7,0.9]:
+        for i in [0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 0.7, 0.9]:
             mp_fa, mp_miss = metrics.obtain_error_rates(
                 speech_frame_ground_truth, speech_frame_prob_predictions, i)
             tn, fp, fn, tp = metrics.confusion_matrix(
