@@ -27,7 +27,7 @@ DEFAULT_ARGS = {
     'num_workers': 4,
     'epochs': 100,
     'transforms': [],
-    'label_type':'soft',
+    'label_type': 'soft',
     'scheduler_args': {
         'patience': 3,
         'factor': 0.1,
@@ -37,7 +37,7 @@ DEFAULT_ARGS = {
     'optimizer_args': {
         'lr': 0.001,
     },
-    'threshold': None,  #Default threshold for postprocessing function
+    'threshold': None,  # Default threshold for postprocessing function
     'postprocessing': 'double',
 }
 
@@ -310,8 +310,8 @@ def double_threshold(x, high_thres, low_thres, n_connect=1):
     # time axis is therefore at 1 for 3d and 0 for 2d (
     return np.apply_along_axis(lambda x: _double_threshold(
         x, high_thres, low_thres, n_connect=n_connect),
-                               axis=apply_dim,
-                               arr=x)
+        axis=apply_dim,
+        arr=x)
 
 
 def _double_threshold(x, high_thres, low_thres, n_connect=1, return_arr=True):
@@ -420,5 +420,6 @@ def rescale_0_1(x):
         def min_max_scale(a):
             return pre.minmax_scale(a, axis=0)
 
+
 def df_to_dict(df, index='filename', value='hdf5path'):
-    return dict(zip(df[index],df[value]))
+    return dict(zip(df[index], df[value]))

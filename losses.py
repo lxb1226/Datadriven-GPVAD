@@ -5,6 +5,7 @@ import torch.nn as nn
 
 class FrameBCELoss(nn.Module):
     """docstring for BCELoss"""
+
     def __init__(self):
         super().__init__()
 
@@ -21,6 +22,7 @@ class FrameBCELoss(nn.Module):
 
 class ClipFrameBCELoss(nn.Module):
     """docstring for BCELoss"""
+
     def __init__(self):
         super().__init__()
         self.frameloss = FrameBCELoss()
@@ -34,6 +36,7 @@ class ClipFrameBCELoss(nn.Module):
 
 class BCELossWithLabelSmoothing(nn.Module):
     """docstring for BCELoss"""
+
     def __init__(self, label_smoothing=0.1):
         super().__init__()
         self.label_smoothing = label_smoothing

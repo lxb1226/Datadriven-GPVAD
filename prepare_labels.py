@@ -47,12 +47,12 @@ class HDF5Dataset(tdata.Dataset):
 MODELS = {
     'crnn': {
         'model': crnn,
-        'encoder': torch.load('labelencoders/vad.pth'),
+        'encoder': torch.load('label_encoders/gpv_f.pth'),
         'outputdim': 527,
     },
     'gpvb': {
         'model': crnn,
-        'encoder': torch.load('labelencoders/vad.pth'),
+        'encoder': torch.load('label_encoders/gpv_b.pth'),
         'outputdim': 2,
     }
 }
