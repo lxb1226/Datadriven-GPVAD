@@ -419,11 +419,11 @@ class MobileNetV2_DM(nn.Module):
 
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
-        n_mels = kwargs.get('n_mels', 64)
-        n_fft = kwargs.get('n_fft', 512)
-        hop_size = kwargs.get('hop_size', 160)
-        win_size = kwargs.get('win_size', 512)
-        f_min = kwargs.get('f_min', 0)
+        # n_mels = kwargs.get('n_mels', 64)
+        # n_fft = kwargs.get('n_fft', 512)
+        # hop_size = kwargs.get('hop_size', 160)
+        # win_size = kwargs.get('win_size', 512)
+        # f_min = kwargs.get('f_min', 0)
 
         input_channel = 32
         last_channel = kwargs.get('last_channel', 1280)
@@ -475,19 +475,19 @@ class MobileNetV2_DM(nn.Module):
                         norm_layer=norm_layer))
         features.append(nn.AdaptiveAvgPool2d((1, None)))
         # make it nn.Sequential
-        self.front_end = nn.Sequential(
-            audio_transforms.MelSpectrogram(f_min=f_min,
-                                            sample_rate=16000,
-                                            win_length=win_size,
-                                            n_fft=n_fft,
-                                            hop_length=hop_size,
-                                            n_mels=n_mels),
-            audio_transforms.AmplitudeToDB(top_db=120),
-        )
-        self.wavtransforms = wavtransforms if wavtransforms != None else nn.Sequential(
-        )
-        self.spectransforms = spectransforms if spectransforms != None else nn.Sequential(
-        )
+        # self.front_end = nn.Sequential(
+        #     audio_transforms.MelSpectrogram(f_min=f_min,
+        #                                     sample_rate=16000,
+        #                                     win_length=win_size,
+        #                                     n_fft=n_fft,
+        #                                     hop_length=hop_size,
+        #                                     n_mels=n_mels),
+        #     audio_transforms.AmplitudeToDB(top_db=120),
+        # )
+        # self.wavtransforms = wavtransforms if wavtransforms != None else nn.Sequential(
+        # )
+        # self.spectransforms = spectransforms if spectransforms != None else nn.Sequential(
+        # )
 
         self.features = nn.Sequential(*features)
 
@@ -512,8 +512,10 @@ class MobileNetV2_DM(nn.Module):
         # # B F T
         # if self.training:
         #     x = self.spectransforms(x)
+        # x: [batch, time, dim] --> [batch, 1, dim, time]
+        x = rearrange(x, 'b t f -> b 1 f t')  # Add channel dim
 
-        x = rearrange(x, 'b f t -> b 1 f t')  # Add channel dim
+        # [batch, 1, dim, time] -->
         x = self.features(x)
         x = rearrange(x, 'b c f t -> b (f t) c')
         x = torch.sigmoid(self.classifier(x))
