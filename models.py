@@ -171,9 +171,9 @@ class CRNN(nn.Module):
         self.outputlayer.apply(init_weights)
 
     def forward(self, x, upsample=True):
-        batch, time, dim = x.shape
+        batch, _, time, dim = x.shape
         # 升维
-        x = x.unsqueeze(1)  # [batch, time, dim] --> [batch, 1, time, dim]
+        # x = x.unsqueeze(1)  # [batch, time, dim] --> [batch, 1, time, dim]
         # [batch, 1, time, dim] --> [batch, 128, time/4, 1]
         x = self.features(x)
         # print("self.features(x).shape : ", x.shape)
@@ -185,17 +185,20 @@ class CRNN(nn.Module):
         # print("self.gru(x).shape : ", x.shape)
         # [batch,  time/4, 256] --> [batch, time/4, output_dim]
         decision_time = torch.sigmoid(self.outputlayer(x)).clamp(1e-7, 1.)
-        print("decision_time shape: ", decision_time.shape)
-        if upsample:
-            decision_time = torch.nn.functional.interpolate(
-                decision_time.transpose(1, 2),
-                time,
-                mode='linear',
-                align_corners=False).transpose(1, 2)
+        # decision = self.temp_pool(x, decision_time).clamp(1e-7, 1.).squeeze(1)
+        decision = self.temp_pool(x, decision_time).clamp(1e-7, 1.)
+
+
+        # if upsample:
+        #     decision_time = torch.nn.functional.interpolate(
+        #         decision_time.transpose(1, 2),
+        #         time,
+        #         mode='linear',
+        #         align_corners=False).transpose(1, 2)
             # 上采样: [batch, time/4, output_dim] --> [batch, time, output_dim]
-        print("decision_time shape: ", decision_time.shape)
-        decision = self.temp_pool(x, decision_time).clamp(1e-7, 1.).squeeze(1)
-        print("decision shape: ", decision.shape)
+
+        
+
         # decision shape: [batch, output_dim]
         # decision_time shape: [batch, time, output_dim]
         return decision, decision_time

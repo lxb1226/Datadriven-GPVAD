@@ -31,6 +31,10 @@ os.environ['CUDA_LAUNCH_BLOCKING'] = '1'  # 下面老是报错 shape 不一致
 
 
 DEVICE = 'cpu'
+if torch.cuda.is_available():
+    DEVICE = 'cuda'
+    # Without results are slightly inconsistent
+    torch.backends.cudnn.deterministic = True
 # if torch.cuda.is_available(
 # ) and 'SLURM_JOB_PARTITION' in os.environ and 'gpu' in os.environ[
 #         'SLURM_JOB_PARTITION']:
@@ -54,16 +58,27 @@ class Runner(object):
         np.random.seed(seed)
 
     @staticmethod
-    def _forward(model, batch):
+    def _forward(model, batch, upsample=True):
         inputs, targets_time, targets_clip, filenames, lengths = batch
         inputs = convert_tensor(inputs, device=DEVICE, non_blocking=True)
+        inputs = inputs.unsqueeze(1)
         targets_time = convert_tensor(targets_time,
                                       device=DEVICE,
                                       non_blocking=True)
         targets_clip = convert_tensor(targets_clip,
                                       device=DEVICE,
                                       non_blocking=True)
+        
         clip_level_output, frame_level_output = model(inputs)
+        clip_level_output = clip_level_output.squeeze(1)
+        _, _, time, _ = inputs.shape
+        if upsample:
+            frame_level_output = torch.nn.functional.interpolate(
+                frame_level_output.transpose(1, 2),
+                time,
+                mode='linear',
+                align_corners=False).transpose(1, 2)
+            # 上采样: [batch, time/4, output_dim] --> [batch, time, output_dim]
         return clip_level_output, frame_level_output, targets_time, targets_clip, lengths
 
     @staticmethod
