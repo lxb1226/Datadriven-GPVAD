@@ -31,6 +31,10 @@ os.environ['CUDA_LAUNCH_BLOCKING'] = '1'  # 下面老是报错 shape 不一致
 
 
 DEVICE = 'cpu'
+if torch.cuda.is_available():
+    DEVICE = 'cuda'
+    # Without results are slightly inconsistent
+    torch.backends.cudnn.deterministic = True
 # if torch.cuda.is_available(
 # ) and 'SLURM_JOB_PARTITION' in os.environ and 'gpu' in os.environ[
 #         'SLURM_JOB_PARTITION']:
