@@ -9,7 +9,7 @@ class FrameBCELoss(nn.Module):
     def __init__(self):
         super().__init__()
 
-    def forward(self, clip_prob, frame_prob, tar_time, tar_clip, length):
+    def forward(self, frame_prob, tar_time, length):
         batchsize, timesteps, ndim = tar_time.shape
         idxs = torch.arange(timesteps, device='cpu').repeat(batchsize).view(
             batchsize, timesteps)

@@ -31,13 +31,7 @@ os.environ['CUDA_LAUNCH_BLOCKING'] = '1'  # 下面老是报错 shape 不一致
 
 
 DEVICE = 'cpu'
-if torch.cuda.is_available():
-    DEVICE = 'cuda'
-    # Without results are slightly inconsistent
-    torch.backends.cudnn.deterministic = True
-# if torch.cuda.is_available(
-# ) and 'SLURM_JOB_PARTITION' in os.environ and 'gpu' in os.environ[
-#         'SLURM_JOB_PARTITION']:
+# if torch.cuda.is_available():
 #     DEVICE = 'cuda'
 #     # Without results are slightly inconsistent
 #     torch.backends.cudnn.deterministic = True
@@ -58,28 +52,17 @@ class Runner(object):
         np.random.seed(seed)
 
     @staticmethod
-    def _forward(model, batch, upsample=True):
+    def _forward(model, batch):
         inputs, targets_time, targets_clip, filenames, lengths = batch
         inputs = convert_tensor(inputs, device=DEVICE, non_blocking=True)
         inputs = inputs.unsqueeze(1)
         targets_time = convert_tensor(targets_time,
                                       device=DEVICE,
                                       non_blocking=True)
-        targets_clip = convert_tensor(targets_clip,
-                                      device=DEVICE,
-                                      non_blocking=True)
-        
-        clip_level_output, frame_level_output = model(inputs)
-        clip_level_output = clip_level_output.squeeze(1)
-        _, _, time, _ = inputs.shape
-        if upsample:
-            frame_level_output = torch.nn.functional.interpolate(
-                frame_level_output.transpose(1, 2),
-                time,
-                mode='linear',
-                align_corners=False).transpose(1, 2)
-            # 上采样: [batch, time/4, output_dim] --> [batch, time, output_dim]
-        return clip_level_output, frame_level_output, targets_time, targets_clip, lengths
+
+        frame_level_output = model(inputs)
+
+        return frame_level_output, targets_time, lengths
 
     @staticmethod
     def _negative_loss(engine):
@@ -206,22 +189,19 @@ class Runner(object):
 
         def thresholded_output_transform(output):
             # Output is (clip, frame, target, lengths)
-            _, y_pred, y, y_clip, length = output
+            y_pred, y, length = output
             batchsize, timesteps, ndim = y.shape
             idxs = torch.arange(timesteps,
                                 device='cpu').repeat(batchsize).view(
                                     batchsize, timesteps)
             mask = (idxs < length.view(-1, 1)).to(y.device)
             y = y * mask.unsqueeze(-1)
-            # logger.debug("==============before=================")
-            # logger.debug(f"y_pred : {y_pred}\ny: {y}")
+
             y_pred = torch.round(y_pred)
             y = torch.round(y)
 
             y_pred = y_pred.contiguous().view(y_pred.size()[0], -1)
             y = y.contiguous().view(y.size()[0], -1)
-            # logger.debug("==============after=================")
-            # logger.debug(f"y_pred : {y_pred}\ny: {y}")
 
             return y_pred, y
 
