@@ -11,6 +11,15 @@ import torchaudio.transforms as audio_transforms
 torchaudio.set_audio_backend('sox_io')
 
 
+def crnn10(inputdim=64, outputdim=527, pretrained_from='balanced.pth'):
+    model = CRNN10(inputdim, outputdim)
+    if pretrained_from:
+        state = torch.load(pretrained_from,
+                           map_location='cpu')
+        model.load_state_dict(state, strict=False)
+    return model
+
+
 def crnn(inputdim=64, outputdim=527, pretrained_from='balanced.pth'):
     model = CRNN(inputdim, outputdim)
     if pretrained_from:
@@ -186,22 +195,19 @@ class CRNN(nn.Module):
         # [batch,  time/4, 256] --> [batch, time/4, output_dim]
         decision_time = torch.sigmoid(self.outputlayer(x)).clamp(1e-7, 1.)
         # decision = self.temp_pool(x, decision_time).clamp(1e-7, 1.).squeeze(1)
-        decision = self.temp_pool(x, decision_time).clamp(1e-7, 1.)
+        # decision = self.temp_pool(x, decision_time).clamp(1e-7, 1.)
 
-
-        # if upsample:
-        #     decision_time = torch.nn.functional.interpolate(
-        #         decision_time.transpose(1, 2),
-        #         time,
-        #         mode='linear',
-        #         align_corners=False).transpose(1, 2)
-            # 上采样: [batch, time/4, output_dim] --> [batch, time, output_dim]
-
-        
+        if upsample:
+            decision_time = torch.nn.functional.interpolate(
+                decision_time.transpose(1, 2),
+                time,
+                mode='linear',
+                align_corners=False).transpose(1, 2)
+        # 上采样: [batch, time/4, output_dim] --> [batch, time, output_dim]
 
         # decision shape: [batch, output_dim]
         # decision_time shape: [batch, time, output_dim]
-        return decision, decision_time
+        return decision_time
 
 
 class CNN10(nn.Module):
@@ -305,19 +311,30 @@ class CRNN10(nn.Module):
         self.outputlayer.apply(init_weights)
 
     def forward(self, x, upsample=True):
-        batch, time, dim = x.shape
-        x = x.unsqueeze(1)
+        # batch, time, dim = x.shape
+        # x = x.unsqueeze(1)
+        # x = self.features(x)
+        # x = x.transpose(1, 2).contiguous().flatten(-2)
+        # decision_time = torch.sigmoid(self.outputlayer(x)).clamp(1e-7, 1.)
+        # decision = self.temp_pool(x, decision_time).clamp(1e-7, 1.).squeeze(1)
+        # if upsample:
+        #     decision_time = torch.nn.functional.interpolate(
+        #         decision_time.transpose(1, 2),
+        #         time,
+        #         mode='linear',
+        #         align_corners=False).transpose(1, 2)
+
+        batch, _, time, dim = x.shape
         x = self.features(x)
         x = x.transpose(1, 2).contiguous().flatten(-2)
         decision_time = torch.sigmoid(self.outputlayer(x)).clamp(1e-7, 1.)
-        decision = self.temp_pool(x, decision_time).clamp(1e-7, 1.).squeeze(1)
         if upsample:
             decision_time = torch.nn.functional.interpolate(
                 decision_time.transpose(1, 2),
                 time,
                 mode='linear',
                 align_corners=False).transpose(1, 2)
-        return decision, decision_time
+        return decision_time
 
 
 # def init_weights(m):
