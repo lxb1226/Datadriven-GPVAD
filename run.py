@@ -67,8 +67,8 @@ class Runner(object):
         targets_clip = convert_tensor(targets_clip,
                                       device=DEVICE,
                                       non_blocking=True)
-        clip_level_output, frame_level_output = model(inputs)
-        return clip_level_output, frame_level_output, targets_time, targets_clip, lengths
+        frame_level_output = model(inputs)
+        return  frame_level_output, targets_time, lengths
 
     @staticmethod
     def _negative_loss(engine):

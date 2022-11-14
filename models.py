@@ -503,12 +503,27 @@ class MobileNetV2_DM(nn.Module):
         # x: [batch, time, dim] --> [batch, 1, dim, time]
         # x = rearrange(x, 'b t f -> b 1 f t')  # Add channel dim
 
-        x = rearrange(x, 'b t f -> b t f 1')
-        # [batch, 1, dim, time] -->
-        x = self.features(x)
-        x = rearrange(x, 'b c f t -> b (f t) c')
-        x = torch.sigmoid(self.classifier(x))
+        # x = rearrange(x, 'b t f -> b t f 1')
+        # # [batch, 1, dim, time] -->
+        # x = self.features(x)
+        # x = rearrange(x, 'b c f t -> b (f t) c')
+        # x = torch.sigmoid(self.classifier(x))
 
         # x: [batch, time, dim, 1]
-        
-        return x.mean(1), x
+
+        x = rearrange(x, 'b f t -> b 1 f t')  # Add channel dim
+        x = self.features(x)
+        print("shape: ", x.shape)
+        x = rearrange(x, 'b c f t -> b (f t) c')
+        print("shape: ", x.shape)
+        x = torch.sigmoid(self.classifier(x))
+        return x.mean(1)
+
+
+if __name__ == "__main__":
+    model = MobileNetV2_DM()
+
+    inp = torch.randn(32, 64, 1)
+    output = model(inp)
+    print(output[0].shape)
+    print(output[1].shape)
