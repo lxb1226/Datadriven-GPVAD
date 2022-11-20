@@ -423,3 +423,14 @@ def rescale_0_1(x):
 
 def df_to_dict(df, index='filename', value='hdf5path'):
     return dict(zip(df[index], df[value]))
+
+
+def model_params(model):
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+
+if __name__ == "__main__":
+    model_path = "experiments/CRNN/2022-11-14_13-49-11_1532564863e011ed9a3800155df4212b/run_model_loss=-0.6099.pt"
+    from models import cnn10, crnn
+    model = crnn(outputdim=2, pretrained_from=model_path)
+    print(model_params(model))
