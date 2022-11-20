@@ -58,9 +58,10 @@ class Runner(object):
         np.random.seed(seed)
 
     @staticmethod
-    def _forward(model, batch):
+    def _forward(model, batch, upsample=True):
         inputs, targets_time, targets_clip, filenames, lengths = batch
         inputs = convert_tensor(inputs, device=DEVICE, non_blocking=True)
+        inputs = inputs.unsqueeze(1)
         targets_time = convert_tensor(targets_time,
                                       device=DEVICE,
                                       non_blocking=True)
@@ -68,7 +69,7 @@ class Runner(object):
                                       device=DEVICE,
                                       non_blocking=True)
         frame_level_output = model(inputs)
-        return  frame_level_output, targets_time, lengths
+        return frame_level_output, targets_time, lengths
 
     @staticmethod
     def _negative_loss(engine):
@@ -195,7 +196,7 @@ class Runner(object):
 
         def thresholded_output_transform(output):
             # Output is (clip, frame, target, lengths)
-            _, y_pred, y, y_clip, length = output
+            y_pred, y, length = output
             batchsize, timesteps, ndim = y.shape
             idxs = torch.arange(timesteps,
                                 device='cpu').repeat(batchsize).view(
