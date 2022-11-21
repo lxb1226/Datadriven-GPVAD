@@ -204,14 +204,14 @@ class CRNN(nn.Module):
         # [batch,  time/4, 256] --> [batch, time/4, output_dim]
         decision_time = torch.sigmoid(self.outputlayer(x)).clamp(1e-7, 1.)
         # decision = self.temp_pool(x, decision_time).clamp(1e-7, 1.).squeeze(1)
-        decision = self.temp_pool(x, decision_time).clamp(1e-7, 1.)
+        # decision = self.temp_pool(x, decision_time).clamp(1e-7, 1.)
 
-        # if upsample:
-        #     decision_time = torch.nn.functional.interpolate(
-        #         decision_time.transpose(1, 2),
-        #         time,
-        #         mode='linear',
-        #         align_corners=False).transpose(1, 2)
+        if upsample:
+            decision_time = torch.nn.functional.interpolate(
+                decision_time.transpose(1, 2),
+                time,
+                mode='linear',
+                align_corners=False).transpose(1, 2)
         # 上采样: [batch, time/4, output_dim] --> [batch, time, output_dim]
 
         # decision shape: [batch, output_dim]
