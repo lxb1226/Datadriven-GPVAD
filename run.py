@@ -31,13 +31,7 @@ os.environ['CUDA_LAUNCH_BLOCKING'] = '1'  # 下面老是报错 shape 不一致
 
 
 DEVICE = 'cpu'
-if torch.cuda.is_available():
-    DEVICE = 'cuda'
-    # Without results are slightly inconsistent
-    torch.backends.cudnn.deterministic = True
-# if torch.cuda.is_available(
-# ) and 'SLURM_JOB_PARTITION' in os.environ and 'gpu' in os.environ[
-#         'SLURM_JOB_PARTITION']:
+# if torch.cuda.is_available():
 #     DEVICE = 'cuda'
 #     # Without results are slightly inconsistent
 #     torch.backends.cudnn.deterministic = True
@@ -58,17 +52,16 @@ class Runner(object):
         np.random.seed(seed)
 
     @staticmethod
-    def _forward(model, batch, upsample=True):
+    def _forward(model, batch):
         inputs, targets_time, targets_clip, filenames, lengths = batch
         inputs = convert_tensor(inputs, device=DEVICE, non_blocking=True)
         inputs = inputs.unsqueeze(1)
         targets_time = convert_tensor(targets_time,
                                       device=DEVICE,
                                       non_blocking=True)
-        targets_clip = convert_tensor(targets_clip,
-                                      device=DEVICE,
-                                      non_blocking=True)
+
         frame_level_output = model(inputs)
+
         return frame_level_output, targets_time, lengths
 
     @staticmethod
@@ -203,15 +196,12 @@ class Runner(object):
                                     batchsize, timesteps)
             mask = (idxs < length.view(-1, 1)).to(y.device)
             y = y * mask.unsqueeze(-1)
-            # logger.debug("==============before=================")
-            # logger.debug(f"y_pred : {y_pred}\ny: {y}")
+
             y_pred = torch.round(y_pred)
             y = torch.round(y)
 
             y_pred = y_pred.contiguous().view(y_pred.size()[0], -1)
             y = y.contiguous().view(y.size()[0], -1)
-            # logger.debug("==============after=================")
-            # logger.debug(f"y_pred : {y_pred}\ny: {y}")
 
             return y_pred, y
 

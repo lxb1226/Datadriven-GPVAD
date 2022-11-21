@@ -204,14 +204,14 @@ class CRNN(nn.Module):
         # [batch,  time/4, 256] --> [batch, time/4, output_dim]
         decision_time = torch.sigmoid(self.outputlayer(x)).clamp(1e-7, 1.)
         # decision = self.temp_pool(x, decision_time).clamp(1e-7, 1.).squeeze(1)
-        # decision = self.temp_pool(x, decision_time).clamp(1e-7, 1.)
+        decision = self.temp_pool(x, decision_time).clamp(1e-7, 1.)
 
-        if upsample:
-            decision_time = torch.nn.functional.interpolate(
-                decision_time.transpose(1, 2),
-                time,
-                mode='linear',
-                align_corners=False).transpose(1, 2)
+        # if upsample:
+        #     decision_time = torch.nn.functional.interpolate(
+        #         decision_time.transpose(1, 2),
+        #         time,
+        #         mode='linear',
+        #         align_corners=False).transpose(1, 2)
         # 上采样: [batch, time/4, output_dim] --> [batch, time, output_dim]
 
         # decision shape: [batch, output_dim]
@@ -261,25 +261,35 @@ class CNN10(nn.Module):
 
     def forward(self, x, upsample=True):
         # x: [batch, time, dim]
-        batch, time, dim = x.shape
-        # x: [batch, 1, time, dim]
-        x = x.unsqueeze(1)
-        # [batch, 1, time, dim] --> [batch, 512, time/4, 1]
+        batch, _, time, dim = x.shape
+        # # x: [batch, 1, time, dim]
+        # x = x.unsqueeze(1)
+        # # [batch, 1, time, dim] --> [batch, 512, time/4, 1]
+        # x = self.features(x)
+        # # [batch, 512, time/4, 1] --> [batch, time/4, 512]
+        # x = x.transpose(1, 2).contiguous().flatten(-2)
+        # # [batch, time/4, 512] --> [batch, time/4, output_dim]
+        # decision_time = torch.sigmoid(self.outputlayer(x)).clamp(1e-7, 1.)
+        # decision = self.temp_pool(x, decision_time).clamp(1e-7, 1.).squeeze(1)
+        # if upsample:
+        #     decision_time = torch.nn.functional.interpolate(
+        #         decision_time.transpose(1, 2),
+        #         time,
+        #         mode='linear',
+        #         align_corners=False).transpose(1, 2)
+        # # decision shape: [batch, output_dim]
+        # # decision_time shape: [batch, time, output_dim]
+
         x = self.features(x)
-        # [batch, 512, time/4, 1] --> [batch, time/4, 512]
         x = x.transpose(1, 2).contiguous().flatten(-2)
-        # [batch, time/4, 512] --> [batch, time/4, output_dim]
         decision_time = torch.sigmoid(self.outputlayer(x)).clamp(1e-7, 1.)
-        decision = self.temp_pool(x, decision_time).clamp(1e-7, 1.).squeeze(1)
-        if upsample:
-            decision_time = torch.nn.functional.interpolate(
-                decision_time.transpose(1, 2),
-                time,
-                mode='linear',
-                align_corners=False).transpose(1, 2)
-        # decision shape: [batch, output_dim]
-        # decision_time shape: [batch, time, output_dim]
-        return decision, decision_time
+        decision_time = torch.nn.functional.interpolate(
+            decision_time.transpose(1, 2),
+            time,
+            mode='linear',
+            align_corners=False
+        ).transpose(1, 2)
+        return decision_time
 
 
 class CRNN10(nn.Module):
@@ -537,13 +547,4 @@ class MobileNetV2_DM(nn.Module):
         x = rearrange(x, 'b c f t -> b (f t) c')
         print("shape: ", x.shape)
         x = torch.sigmoid(self.classifier(x))
-        return x.mean(1)
-
-
-if __name__ == "__main__":
-    model = MobileNetV2_DM()
-
-    inp = torch.randn(32, 64, 1)
-    output = model(inp)
-    print(output[0].shape)
-    print(output[1].shape)
+        return x.mean(1), x
