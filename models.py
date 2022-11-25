@@ -8,6 +8,7 @@ from einops import rearrange, reduce
 from einops.layers.torch import Rearrange
 import torchaudio
 import torchaudio.transforms as audio_transforms
+import torch.nn.functional as F
 torchaudio.set_audio_backend('sox_io')
 
 
@@ -548,3 +549,39 @@ class MobileNetV2_DM(nn.Module):
         print("shape: ", x.shape)
         x = torch.sigmoid(self.classifier(x))
         return x.mean(1), x
+
+
+class DNN(nn.Module):
+    def __init__(self, inputdim=64, outputdim=2, hidden_size=128, **kwargs) -> None:
+        super(DNN, self).__init__()
+        self.fc1 = nn.Linear(inputdim, hidden_size)
+        self.bn1 = nn.BatchNorm1d(32)
+        self.fc1_drop = nn.Dropout(p=0.2)
+
+        self.fc2 = nn.Linear(hidden_size, hidden_size)
+        self.bn2 = nn.BatchNorm1d(32)
+        self.fc2_drop = nn.Dropout(p=0.2)
+
+        self.fc3 = nn.Linear(hidden_size, hidden_size)
+        self.bn3 = nn.BatchNorm1d(32)
+        self.fc3_drop = nn.Dropout(p=0.2)
+
+        self.last = nn.Linear(hidden_size, outputdim)
+
+    def forward(self, x):
+        # x : [batch, 1, time, dim]
+        x = x.squeeze(1)
+        out = F.relu(self.bn1((self.fc1(x))))
+        out = F.relu(self.bn2((self.fc2(out))))
+        out = F.relu(self.bn3((self.fc3(out))))
+
+        out = self.last(out)
+
+        return out
+
+
+if __name__ == "__main__":
+    inp = torch.randn(32, 1, 32, 64)
+    model = DNN()
+    output = model(inp)
+    print(output.shape)

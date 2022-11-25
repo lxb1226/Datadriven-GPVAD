@@ -96,7 +96,7 @@ cd data;
 mkdir hdf5 csv_labels;
 find balanced -type f > wavs.txt;
 python3 extract_features.py wavs.txt -o hdf5/balanced.h5
-h5ls -r hdf5/balanced.h5 | awk -F[/' '] 'BEGIN{print "filename","hdf5path"}NR>1{print $2,"hdf5/balanced.h5"}'> csv_labels/balanced.csv
+h5ls -r ../../data/hdf5/balanced.h5 | awk -F'[ ]' 'BEGIN{print "filename", "hdf5path"}NR>1{print $1, "/home/heyjude/workspace/data/hdf5/balanced.h5"}' > ../../data/csv_labels/balanced.csv
 ```
 
 
@@ -116,7 +116,7 @@ After feature extraction, proceed to predict labels:
 
 ```bash
 mkdir -p softlabels/{hdf5,csv};
-python3 prepare_labels.py --pre ../pretrained_models/teacher1/model.pth csv_labels/balanced.csv softlabels/hdf5/balanced.h5 softlabels/csv/balanced.csv
+python3 prepare_labels.py --pre ../pretrained_models/teacher1/model.pth ../../data/csv_labels/balanced.csv ../../data/softlabels/hdf5/balanced.h5 ../../data/softlabels/csv/balanced.csv
 ```
 
 Lastly, just train:
@@ -156,4 +156,11 @@ and
   url={http://dx.doi.org/10.21437/Interspeech.2020-0995}
 }
 ```
+
+### 数据目录
+- audio: 存放原始数据
+- csv_labels: 存放音频和其hdf5数据对应的csv文件
+- hdf5: 存放特征数据
+- softlabels/csvs: 存放对应关系
+- softlabels/hdf5: 存放标签数据
 
