@@ -31,10 +31,10 @@ os.environ['CUDA_LAUNCH_BLOCKING'] = '1'  # 下面老是报错 shape 不一致
 
 
 DEVICE = 'cpu'
-if torch.cuda.is_available():
-    DEVICE = 'cuda'
-    # Without results are slightly inconsistent
-    torch.backends.cudnn.deterministic = True
+# if torch.cuda.is_available():
+#     DEVICE = 'cuda'
+#     # Without results are slightly inconsistent
+#     torch.backends.cudnn.deterministic = True
 DEVICE = torch.device(DEVICE)
 
 
@@ -252,7 +252,7 @@ class Runner(object):
 
     def train_evaluate(self,
                        config,
-                       tasks=['aurora_clean', 'aurora_noisy', 'dcase18'],
+                       tasks=['librispeech_clean'],
                        **kwargs):
         experiment_path = self.train(config, **kwargs)
         for task in tasks:
@@ -383,12 +383,16 @@ class Runner(object):
 
     def evaluate(self,
                  experiment_path: Path,
-                 task: str = 'aurora_clean',
+                 task: str = 'librispeech_clean',
                  model_resolution=0.02,
                  time_resolution=0.02,
                  threshold=(0.5, 0.1),
                  **kwargs):
         EVALUATION_DATA = {
+            'librispeech_clean': {
+                'data': '../data/hdf5/librispeech_clean.h5',
+                'label': '../data/labels/librispeech_clean.csv'
+            },
             'aurora_clean': {
                 'data': 'data/evaluation/hdf5/aurora_clean.h5',
                 'label': 'data/evaluation/labels/aurora_clean_labels.tsv',
@@ -453,7 +457,7 @@ class Runner(object):
         # Default columns to search for in data
         model_parameters = torch.load(
             model_path, map_location=lambda storage, loc: storage)
-        encoder = torch.load('labelencoders/vad.pth')
+        encoder = torch.load('label_encoders/gpv_b.pth')
         data = EVALUATION_DATA[task]['data']
         label_df = pd.read_csv(EVALUATION_DATA[task]['label'], sep='\s+')
         label_df['filename'] = label_df['filename'].apply(
@@ -509,8 +513,9 @@ class Runner(object):
             for feature, filename in dataloader:
                 feature = torch.as_tensor(feature).to(DEVICE)
                 # PANNS output a dict instead of 2 values
-                prediction_tag, prediction_time = model(feature)
-                prediction_tag = prediction_tag.to('cpu')
+                feature = feature.unsqueeze(1)
+                prediction_time = model(feature)
+                # prediction_tag = prediction_tag.to('cpu')
                 prediction_time = prediction_time.to('cpu')
 
                 if prediction_time is not None:  # Some models do not predict timestamps
