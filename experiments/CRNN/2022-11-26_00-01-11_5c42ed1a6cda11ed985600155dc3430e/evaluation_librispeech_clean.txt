@@ -1,0 +1,115 @@
+data:../data/csv_labels/balanced.csv
+label:../data/softlabels/csv/balanced.csv
+batch_size:64
+data_args:{'mode': None}
+num_workers:8
+optimizer:AdamW
+optimizer_args:{'lr': 0.001}
+scheduler_args:{'patience': 10, 'factor': 0.1}
+early_stop:15
+epochs:100
+itercv:10000
+save:best
+model:CRNN
+model_args:{}
+outputpath:experiments/
+transforms:['timemask', 'freqmask']
+loss:FrameBCELoss
+label_type:soft
+threshold:None
+postprocessing:double
+Segment based metrics
+========================================
+  Evaluated length                  : 18863.38 sec
+  Evaluated files                   : 2620 
+  Segment length                    : 20.00 ms
+
+  Overall metrics (micro-average)
+  ======================================
+  F-measure
+    F-measure (F1)                  : 97.65 %
+    Precision                       : 98.02 %
+    Recall                          : 97.28 %
+  Error rate
+    Error rate (ER)                 : 0.05 
+    Substitution rate               : 0.00 
+    Deletion rate                   : 0.03 
+    Insertion rate                  : 0.02 
+  Accuracy
+    Sensitivity                     : 97.28 %
+    Specificity                     : 82.90 %
+    Balanced accuracy               : 90.09 %
+    Accuracy                        : 95.80 %
+
+  Class-wise average metrics (macro-average)
+  ======================================
+  F-measure
+    F-measure (F1)                  : 97.65 %
+    Precision                       : 98.02 %
+    Recall                          : 97.28 %
+  Error rate
+    Error rate (ER)                 : 0.05 
+    Deletion rate                   : 0.03 
+    Insertion rate                  : 0.02 
+  Accuracy
+    Sensitivity                     : 97.28 %
+    Specificity                     : 82.90 %
+    Balanced accuracy               : 90.09 %
+    Accuracy                        : 95.80 %
+  
+
+  Class-wise metrics
+  ======================================
+    Event label  | Nref    Nsys  | F        Pre      Rec    | ER       Del      Ins    | Sens     Spec     Bacc     Acc     
+    ------------ | -----   ----- | ------   ------   ------ | ------   ------   ------ | ------   ------   ------   ------  
+    Speech       | 846..   839.. | 97.6%    98.0%    97.3%  | 0.05     0.03     0.02   | 97.3%    82.9%    90.1%    95.8%   
+
+
+Event based metrics (onset-offset)
+========================================
+  Evaluated length                  : 18862.50 sec
+  Evaluated files                   : 2620 
+  Evaluate onset                    : True 
+  Evaluate offset                   : True 
+  T collar                          : 200.00 ms
+  Offset (length)                   : 20.00 %
+
+  Overall metrics (micro-average)
+  ======================================
+  F-measure
+    F-measure (F1)                  : 79.75 %
+    Precision                       : 81.28 %
+    Recall                          : 78.28 %
+  Error rate
+    Error rate (ER)                 : 0.40 
+    Substitution rate               : 0.00 
+    Deletion rate                   : 0.22 
+    Insertion rate                  : 0.18 
+
+  Class-wise average metrics (macro-average)
+  ======================================
+  F-measure
+    F-measure (F1)                  : 79.75 %
+    Precision                       : 81.28 %
+    Recall                          : 78.28 %
+  Error rate
+    Error rate (ER)                 : 0.40 
+    Deletion rate                   : 0.22 
+    Insertion rate                  : 0.18 
+  
+
+  Class-wise metrics
+  ======================================
+    Event label  | Nref    Nsys  | F        Pre      Rec    | ER       Del      Ins    |
+    ------------ | -----   ----- | ------   ------   ------ | ------   ------   ------ |
+    Speech       | 5807    5593  | 79.8%    81.3%    78.3%  | 0.40     0.22     0.18   |
+
+
+VAD micro F1: 95.848     95.848     Recall: 95.848    
+VAD macro F1: 91.144     90.379     Recall: 91.954    
+VAD binary F1: 97.598     97.947     Recall: 97.252    
+FER: 4.15
+AUC: 98.57
+Pfa: 13.34
+Pmiss: 2.75
+ACC: 95.85

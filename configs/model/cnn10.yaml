@@ -1,0 +1,15 @@
+models:
+  mobilenet_v1:
+    platform: onnx
+    model_file_path: /workspace/Datadriven-GPVAD/onnx/cnn10.onnx
+    model_sha256_checksum: 39955d25563a31caae5226c794c264e275aa201e18a67d418660aef507205615
+    subgraphs:
+      - input_tensors:
+          - input
+        input_shapes:
+          - 1,10,64
+        output_tensors:
+          - output
+        output_shapes:
+          - 1,2
+    runtime: cpu

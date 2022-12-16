@@ -1,0 +1,2 @@
+time,model,dataset,batch,Loss,Precision,Recall,Accuracy
+2022-11-24_22-34-11,CRNN,Validation,1    ,0.72 ,0.68 ,0.61 ,0.87 

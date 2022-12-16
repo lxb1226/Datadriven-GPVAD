@@ -1,0 +1,115 @@
+data:../data/csv_labels/balanced.csv
+label:../data/softlabels/csv/balanced.csv
+batch_size:64
+data_args:{'mode': None}
+num_workers:8
+optimizer:AdamW
+optimizer_args:{'lr': 0.001}
+scheduler_args:{'patience': 10, 'factor': 0.1}
+early_stop:15
+epochs:5
+itercv:10000
+save:best
+model:CNN10
+model_args:{}
+outputpath:experiments/
+transforms:['timemask', 'freqmask']
+loss:FrameBCELoss
+label_type:soft
+threshold:None
+postprocessing:double
+Segment based metrics
+========================================
+  Evaluated length                  : 18862.62 sec
+  Evaluated files                   : 2620 
+  Segment length                    : 20.00 ms
+
+  Overall metrics (micro-average)
+  ======================================
+  F-measure
+    F-measure (F1)                  : 95.61 %
+    Precision                       : 99.48 %
+    Recall                          : 92.02 %
+  Error rate
+    Error rate (ER)                 : 0.08 
+    Substitution rate               : 0.00 
+    Deletion rate                   : 0.08 
+    Insertion rate                  : 0.00 
+  Accuracy
+    Sensitivity                     : 92.02 %
+    Specificity                     : 95.83 %
+    Balanced accuracy               : 93.93 %
+    Accuracy                        : 92.41 %
+
+  Class-wise average metrics (macro-average)
+  ======================================
+  F-measure
+    F-measure (F1)                  : 95.61 %
+    Precision                       : 99.48 %
+    Recall                          : 92.02 %
+  Error rate
+    Error rate (ER)                 : 0.08 
+    Deletion rate                   : 0.08 
+    Insertion rate                  : 0.00 
+  Accuracy
+    Sensitivity                     : 92.02 %
+    Specificity                     : 95.83 %
+    Balanced accuracy               : 93.93 %
+    Accuracy                        : 92.41 %
+  
+
+  Class-wise metrics
+  ======================================
+    Event label  | Nref    Nsys  | F        Pre      Rec    | ER       Del      Ins    | Sens     Spec     Bacc     Acc     
+    ------------ | -----   ----- | ------   ------   ------ | ------   ------   ------ | ------   ------   ------   ------  
+    Speech       | 846..   782.. | 95.6%    99.5%    92.0%  | 0.08     0.08     0.00   | 92.0%    95.8%    93.9%    92.4%   
+
+
+Event based metrics (onset-offset)
+========================================
+  Evaluated length                  : 18862.50 sec
+  Evaluated files                   : 2620 
+  Evaluate onset                    : True 
+  Evaluate offset                   : True 
+  T collar                          : 200.00 ms
+  Offset (length)                   : 20.00 %
+
+  Overall metrics (micro-average)
+  ======================================
+  F-measure
+    F-measure (F1)                  : 71.58 %
+    Precision                       : 66.15 %
+    Recall                          : 77.99 %
+  Error rate
+    Error rate (ER)                 : 0.62 
+    Substitution rate               : 0.00 
+    Deletion rate                   : 0.22 
+    Insertion rate                  : 0.40 
+
+  Class-wise average metrics (macro-average)
+  ======================================
+  F-measure
+    F-measure (F1)                  : 71.58 %
+    Precision                       : 66.15 %
+    Recall                          : 77.99 %
+  Error rate
+    Error rate (ER)                 : 0.62 
+    Deletion rate                   : 0.22 
+    Insertion rate                  : 0.40 
+  
+
+  Class-wise metrics
+  ======================================
+    Event label  | Nref    Nsys  | F        Pre      Rec    | ER       Del      Ins    |
+    ------------ | -----   ----- | ------   ------   ------ | ------   ------   ------ |
+    Speech       | 5807    6847  | 71.6%    66.1%    78.0%  | 0.62     0.22     0.40   |
+
+
+VAD micro F1: 92.611     92.611     Recall: 92.611    
+VAD macro F1: 86.593     82.144     Recall: 94.316    
+VAD binary F1: 95.575     99.445     Recall: 91.996    
+FER: 7.39
+AUC: 98.25
+Pfa: 3.36
+Pmiss: 8.00
+ACC: 92.61
