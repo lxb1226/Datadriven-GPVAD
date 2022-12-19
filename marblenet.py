@@ -1,207 +1,123 @@
-from collections import OrderedDict
-from dataclasses import dataclass, field
-from typing import List, Optional, Union
-
+# Some utility imports
+import sys
+from torchmetrics import ConfusionMatrix
+from nemo.utils.exp_manager import exp_manager
+import pytorch_lightning as pl
 import torch
-import torch.distributed
-import torch.nn as nn
-import torch.nn.functional as F
-from omegaconf import MISSING, DictConfig, ListConfig, OmegaConf
-
-from jasper import MaskedConv1d, JasperBlock, SqueezeExcite, init_weights
-import logging
+import os
+from omegaconf import OmegaConf
+import argparse
+from torchmetrics import Accuracy, F1Score, AUROC, ConfusionMatrix
+from loguru import logger
 
 
-class ConvASREncoder(nn.Module):
-    """
-    Convolutional encoder for ASR models. With this class you can implement JasperNet and QuartzNet models.
-
-    Based on these papers:
-        https://arxiv.org/pdf/1904.03288.pdf
-        https://arxiv.org/pdf/1910.10261.pdf
-    """
-
-    def __init__(
-        self,
-        jasper,
-        activation: str,
-        feat_in: int,
-        normalization_mode: str = "batch",
-        residual_mode: str = "add",
-        norm_groups: int = -1,
-        conv_mask: bool = True,
-        frame_splicing: int = 1,
-        init_mode: Optional[str] = 'xavier_uniform',
-        quantize: bool = False,
-    ):
-        super().__init__()
-        if isinstance(jasper, ListConfig):
-            jasper = OmegaConf.to_container(jasper)
-
-        activation = jasper_activations[activation]()
-
-        # If the activation can be executed in place, do so.
-        if hasattr(activation, 'inplace'):
-            activation.inplace = True
-
-        feat_in = feat_in * frame_splicing
-
-        self._feat_in = feat_in
-
-        residual_panes = []
-        encoder_layers = []
-        self.dense_residual = False
-        for lcfg in jasper:
-            dense_res = []
-            if lcfg.get('residual_dense', False):
-                residual_panes.append(feat_in)
-                dense_res = residual_panes
-                self.dense_residual = True
-            groups = lcfg.get('groups', 1)
-            separable = lcfg.get('separable', False)
-            heads = lcfg.get('heads', -1)
-            residual_mode = lcfg.get('residual_mode', residual_mode)
-            se = lcfg.get('se', False)
-            se_reduction_ratio = lcfg.get('se_reduction_ratio', 8)
-            se_context_window = lcfg.get('se_context_size', -1)
-            se_interpolation_mode = lcfg.get(
-                'se_interpolation_mode', 'nearest')
-            kernel_size_factor = lcfg.get('kernel_size_factor', 1.0)
-            stride_last = lcfg.get('stride_last', False)
-            future_context = lcfg.get('future_context', -1)
-            encoder_layers.append(
-                JasperBlock(
-                    feat_in,
-                    lcfg['filters'],
-                    repeat=lcfg['repeat'],
-                    kernel_size=lcfg['kernel'],
-                    stride=lcfg['stride'],
-                    dilation=lcfg['dilation'],
-                    dropout=lcfg['dropout'],
-                    residual=lcfg['residual'],
-                    groups=groups,
-                    separable=separable,
-                    heads=heads,
-                    residual_mode=residual_mode,
-                    normalization=normalization_mode,
-                    norm_groups=norm_groups,
-                    activation=activation,
-                    residual_panes=dense_res,
-                    conv_mask=conv_mask,
-                    se=se,
-                    se_reduction_ratio=se_reduction_ratio,
-                    se_context_window=se_context_window,
-                    se_interpolation_mode=se_interpolation_mode,
-                    kernel_size_factor=kernel_size_factor,
-                    stride_last=stride_last,
-                    future_context=future_context,
-                    quantize=quantize,
-                )
-            )
-            feat_in = lcfg['filters']
-
-        self._feat_out = feat_in
-
-        self.encoder = torch.nn.Sequential(*encoder_layers)
-        self.apply(lambda x: init_weights(x, mode=init_mode))
-
-        self.max_audio_length = 0
-
-    def forward(self, audio_signal, length):
-        self.update_max_sequence_length(
-            seq_length=audio_signal.size(2), device=audio_signal.device)
-        s_input, length = self.encoder(([audio_signal], length))
-        if length is None:
-            return s_input[-1]
-
-        return s_input[-1], length
-
-    def update_max_sequence_length(self, seq_length: int, device):
-        # Find global max audio length across all nodes
-        if torch.distributed.is_initialized():
-            global_max_len = torch.tensor(
-                [seq_length], dtype=torch.float32, device=device)
-
-            # Update across all ranks in the distributed system
-            torch.distributed.all_reduce(
-                global_max_len, op=torch.distributed.ReduceOp.MAX)
-
-            seq_length = global_max_len.int().item()
-
-        if seq_length > self.max_audio_length:
-            if seq_length < 5000:
-                seq_length = seq_length * 2
-            elif seq_length < 10000:
-                seq_length = seq_length * 1.5
-            self.max_audio_length = seq_length
-
-            device = next(self.parameters()).device
-            seq_range = torch.arange(0, self.max_audio_length, device=device)
-            if hasattr(self, 'seq_range'):
-                self.seq_range = seq_range
-            else:
-                self.register_buffer('seq_range', seq_range, persistent=False)
-
-            # Update all submodules
-            for name, m in self.named_modules():
-                if isinstance(m, MaskedConv1d):
-                    m.update_masked_length(
-                        self.max_audio_length, seq_range=self.seq_range)
-                elif isinstance(m, SqueezeExcite):
-                    m.set_max_len(self.max_audio_length,
-                                  seq_range=self.seq_range)
+# NeMo's "core" package
+import nemo
+# NeMo's ASR collection - this collections contains complete ASR models and
+# building blocks (modules) for ASR
+import nemo.collections.asr as nemo_asr
 
 
-class ConvASRDecoderClassification(nn.Module):
-    """Simple ASR Decoder for use with classification models such as JasperNet and QuartzNet
+@torch.no_grad()
+def extract_logits(model, dataloader):
+    logits_buffer = []
+    label_buffer = []
 
-     Based on these papers:
-        https://arxiv.org/pdf/2005.04290.pdf
-    """
+    # Follow the above definition of the test_step
+    for batch in dataloader:
+        audio_signal, audio_signal_len, labels, labels_len = batch
+        # print(audio_signal.size())
+        # print(audio_signal_len.size())
+        logits = model(input_signal=audio_signal,
+                       input_signal_length=audio_signal_len)
 
-    def __init__(
-        self,
-        feat_in: int,
-        num_classes: int,
-        init_mode: Optional[str] = "xavier_uniform",
-        return_logits: bool = True,
-        pooling_type='avg',
-    ):
-        super().__init__()
+        logits_buffer.append(logits)
+        label_buffer.append(labels)
+        print(".", end='')
+    print()
 
-        self._feat_in = feat_in
-        self._return_logits = return_logits
-        self._num_classes = num_classes
-
-        if pooling_type == 'avg':
-            self.pooling = torch.nn.AdaptiveAvgPool1d(1)
-        elif pooling_type == 'max':
-            self.pooling = torch.nn.AdaptiveMaxPool1d(1)
-        else:
-            raise ValueError(
-                'Pooling type chosen is not valid. Must be either `avg` or `max`')
-
-        self.decoder_layers = torch.nn.Sequential(
-            torch.nn.Linear(self._feat_in, self._num_classes, bias=True))
-        self.apply(lambda x: init_weights(x, mode=init_mode))
-
-    # @typecheck()
-    def forward(self, encoder_output):
-        batch, in_channels, timesteps = encoder_output.size()
-
-        encoder_output = self.pooling(encoder_output).view(
-            batch, in_channels)  # [B, C]
-        logits = self.decoder_layers(encoder_output)  # [B, num_classes]
-
-        if self._return_logits:
-            return logits
-
-        return torch.nn.functional.softmax(logits, dim=-1)
+    print("Finished extracting logits !")
+    logits = torch.cat(logits_buffer, 0)
+    labels = torch.cat(label_buffer, 0)
+    return logits, labels
 
 
-class MarbleNet(nn.Module):
-    def __init__(self) -> None:
-        super().__init__()
+# metrics: VAD binary F1, FER, AUC, Pfa, Pmiss, ACC
 
-    def forward():
-        pass
+def compute_metrics(pred, labels):
+    accuracy = Accuracy('binary', num_classes=2)
+    f1_score = F1Score('binary', num_classes=2)
+    auroc = AUROC('binary', num_classes=2)
+    matrix = ConfusionMatrix('binary', num_classes=2)
+
+    acc = accuracy(pred, labels)
+    f1score = f1_score(pred, labels)
+    auc = auroc(pred, labels)
+    tn, fp, fn, tp = matrix(pred, labels).ravel()
+    fer = 100 * ((fp + fn) / pred.size()[0])
+    p_miss = 100 * (fn / (fn + tp))
+    p_fa = 100 * (fp / (fp + tn))
+
+    return acc, f1score, auc, fer, p_miss, p_fa
+
+
+def getfile_outlogger(outputfile):
+    log_format = "[<green>{time:YYYY-MM-DD HH:mm:ss}</green>] {message}"
+    logger.configure(handlers=[{"sink": sys.stderr, "format": log_format}])
+    if outputfile:
+        logger.add(outputfile, enqueue=True, format=log_format)
+    return logger
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", default="config/marblenet.yml")
+    parser.add_argument("--log_file", default="result.log")
+
+    args = parser.parse_args()
+
+    # This line will print the entire config of the MarbleNet model
+    config_path = args.config
+    config = OmegaConf.load(config_path)
+    config = OmegaConf.to_container(config, resolve=True)
+    config = OmegaConf.create(config)
+
+    trainer = pl.Trainer(**config.trainer)
+    exp_dir = exp_manager(trainer, config.get("exp_manager", None))
+    log_file = args.log_file
+    output_file = exp_dir/log_file
+    logger = getfile_outlogger(str(output_file))
+    vad_model = nemo_asr.models.EncDecClassificationModel(
+        cfg=config.model, trainer=trainer)
+
+    trainer.fit(vad_model)
+    trainer.test(vad_model, ckpt_path=None)
+
+    vad_model.setup_test_data(config.model.test_ds)
+    test_dl = vad_model._test_dl
+
+    cpu_model = vad_model.cpu()
+    cpu_model.eval()
+    logits, labels = extract_logits(cpu_model, test_dl)
+    _, pred = logits.topk(1, dim=1, largest=True, sorted=True)
+    pred = pred.squeeze()
+
+    # compute metrics
+    acc, f1score, auc, fer, p_miss, p_fa = compute_metrics(pred, labels)
+    logger.info(
+        f'acc: {acc}, f1score: {f1score}, auc: {auc}, fer: {fer}, p_miss: {p_miss}, p_fa: {p_fa}')
+    # 参数量
+
+    # 运行时间
+
+    # export model to onnx
+    onnx_model_file = exp_dir/'marblenet.onnx'
+    audio_signal = torch.randn(10, 64, 64)
+    audio_signal_len = torch.full(
+        size=(audio_signal.shape[0], ), fill_value=10)
+
+    # vad_model.export(output=str(onnx_model_file),
+    #                  input_example=tuple([audio_signal, audio_signal_len]))
+    # dynamic_axes = {"audio_signal": [0], "logits": [1]}
+    vad_model.export(output=str(onnx_model_file),
+                     input_example=tuple([audio_signal, audio_signal_len]))
